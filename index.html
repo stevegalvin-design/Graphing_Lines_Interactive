@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guided Line Builder | Interactive Algebra 1 Graphing Lab</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: #1e293b;
+      --card-bg: #334155;
+      --accent-blue: #38bdf8;
+      --accent-green: #4ade80;
+      --accent-amber: #fbbf24;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #475569;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+
+    header { text-align: center; margin-bottom: 20px; }
+    header h1 { color: var(--accent-blue); font-size: 2rem; text-transform: uppercase; letter-spacing: 1px; }
+    header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 5px; }
+
+    /* Landing Screen Cards */
+    .mode-selection-container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 1000px; margin-top: 30px; }
+    .mode-card { background: var(--panel-bg); border: 2px solid var(--border-color); border-radius: 12px; padding: 25px; width: 280px; text-align: center; cursor: pointer; transition: transform 0.2s, border-color 0.2s; display: flex; flex-direction: column; justify-content: space-between; user-select: none; }
+    .mode-card:hover { border-color: var(--accent-blue); transform: translateY(-4px); }
+    .mode-card h2 { color: var(--accent-blue); font-size: 1.3rem; margin-bottom: 10px; }
+    .mode-card p { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 20px; line-height: 1.4; }
+    .mode-card .form-formula { font-family: monospace; background: var(--card-bg); padding: 8px; border-radius: 6px; color: var(--accent-amber); font-weight: bold; margin-bottom: 15px; }
+    .mode-btn { background: var(--accent-blue); color: #000; border: none; padding: 10px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; font-size: 0.95rem; }
+
+    /* Workspace Interface */
+    .workspace-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 1050px; }
+    .nav-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: var(--panel-bg); padding: 12px 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 15px; }
+    .nav-bar button { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .nav-bar button:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    .input-panel { width: 100%; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; }
+    .input-panel label { font-weight: bold; color: var(--accent-amber); font-size: 1rem; }
+    .input-panel input { background: var(--bg-dark); border: 2px solid var(--border-color); color: #fff; padding: 8px 14px; border-radius: 6px; font-family: monospace; font-size: 1.1rem; width: 300px; text-align: center; }
+    .input-panel button { background: var(--accent-green); color: #000; border: none; padding: 8px 18px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+
+    .instruction-banner { width: 100%; background: #1e1b4b; border: 2px solid #6366f1; border-radius: 8px; padding: 14px 20px; text-align: center; margin-bottom: 15px; }
+    .instruction-banner .step-title { color: #a5b4fc; font-size: 0.85rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+    .instruction-banner .step-desc { color: #fff; font-size: 1.15rem; font-weight: 500; margin-top: 4px; }
+
+    .graph-viewport { position: relative; width: 600px; height: 600px; background: #020617; border: 2px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    svg#grid-svg { width: 100%; height: 100%; cursor: crosshair; }
+
+    .coord-hud { position: absolute; bottom: 12px; right: 12px; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; font-family: monospace; font-size: 0.9rem; color: var(--accent-blue); pointer-events: none; }
+    .feedback-toast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 18px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; display: none; z-index: 10; }
+    .feedback-toast.error { background: rgba(244, 63, 94, 0.95); color: #fff; }
+    .feedback-toast.success { background: rgba(74, 222, 128, 0.95); color: #000; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div style="font-size:0.8rem; letter-spacing:2px; color:var(--accent-blue); font-weight:bold; text-transform:uppercase;">Steve's High School Math Lab</div>
+    <h1>Guided Line Builder</h1>
+    <p>Construct line graphs step-by-step using scaffolded anchor points and rise/run vectors!</p>
+  </header>
+
+  <!-- LANDING PAGE -->
+  <div id="landing-screen" class="mode-selection-container">
+    <div class="mode-card" data-mode="slope-intercept">
+      <div>
+        <h2>Slope-Intercept</h2>
+        <div class="form-formula">y = mx + b</div>
+        <p>Identify and plot the y-intercept anchor point, then apply the slope vector (rise/run).</p>
+      </div>
+      <button class="mode-btn" data-mode="slope-intercept">Start Practice</button>
+    </div>
+
+    <div class="mode-card" data-mode="point-slope">
+      <div>
+        <h2>Point-Slope</h2>
+        <div class="form-formula">y - y₁ = m(x - x₁)</div>
+        <p>Navigate sign flips to plot the given point (x₁, y₁), then apply the slope vector.</p>
+      </div>
+      <button class="mode-btn" data-mode="point-slope">Start Practice</button>
+    </div>
+
+    <div class="mode-card" data-mode="standard">
+      <div>
+        <h2>Standard Form</h2>
+        <div class="form-formula">Ax + By = C</div>
+        <p>Use the cover-up method to calculate and plot the x-intercept and y-intercept.</p>
+      </div>
+      <button class="mode-btn" data-mode="standard">Start Practice</button>
+    </div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <div id="workspace" class="workspace-container">
+    <div class="nav-bar">
+      <button id="btn-back">← Back to Mode Menu</button>
+      <div id="current-mode-label" style="font-weight:bold; color:var(--accent-amber);">MODE: Slope-Intercept</div>
+      <button id="btn-random">New Random Equation</button>
+    </div>
+
+    <div class="input-panel">
+      <label for="eq-input">Target Equation:</label>
+      <input type="text" id="eq-input" value="y = 2/3x - 1" />
+      <button id="btn-load">Load &amp; Build</button>
+    </div>
+
+    <div class="instruction-banner">
+      <div id="step-title" class="step-title">STEP 1 OF 2</div>
+      <div id="step-desc" class="step-desc">Plot the anchor point on the grid.</div>
+    </div>
+
+    <div class="graph-viewport">
+      <div id="feedback-toast" class="feedback-toast"></div>
+      <div id="coord-hud" class="coord-hud">Cursor: (0, 0)</div>
+      <svg id="grid-svg" viewBox="-10 -10 20 20" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+
+  <script>
+    let activeMode = 'slope-intercept';
+    let stepNum = 1;
+    let targetData = {};
+    let point1 = null;
+    let point2 = null;
+
+    window.addEventListener('click', function(e) {
+      const card = e.target.closest('[data-mode]');
+      if (card) {
+        startApp(card.getAttribute('data-mode'));
+        return;
+      }
+
+      if (e.target.id === 'btn-back') goHome();
+      if (e.target.id === 'btn-random') newRandomEquation();
+      if (e.target.id === 'btn-load') loadEquation();
+    });
+
+    function startApp(mode) {
+      activeMode = mode;
+      document.getElementById('landing-screen').style.display = 'none';
+      document.getElementById('workspace').style.display = 'flex';
+
+      const modeTitles = {
+        'slope-intercept': 'MODE: Slope-Intercept (y = mx + b)',
+        'point-slope': 'MODE: Point-Slope (y - y₁ = m(x - x₁))',
+        'standard': 'MODE: Standard Form (Ax + By = C)'
+      };
+      document.getElementById('current-mode-label').innerText = modeTitles[mode];
+
+      newRandomEquation();
+      initGrid();
+    }
+
+    function goHome() {
+      document.getElementById('landing-screen').style.display = 'flex';
+      document.getElementById('workspace').style.display = 'none';
+    }
+
+    function parseVal(str) {
+      if (!str) return 0;
+      str = str.replace(/\s+/g, '');
+      if (str === '+' || str === '') return 1;
+      if (str === '-') return -1;
+      if (str.includes('/')) {
+        let p = str.split('/');
+        return parseFloat(p[0]) / parseFloat(p[1]);
+      }
+      return parseFloat(str);
+    }
+
+    function parseCustomEquation(str) {
+      str = str.replace(/\s+/g, '').toLowerCase();
+
+      if (activeMode === 'slope-intercept') {
+        let parts = str.split('=');
+        if (parts.length === 2 && parts[0] === 'y') {
+          let rhs = parts[1];
+          let xIdx = rhs.indexOf('x');
+          if (xIdx !== -1) {
+            let mStr = rhs.substring(0, xIdx) || '1';
+            let bStr = rhs.substring(xIdx + 1);
+            let mNum = parseVal(mStr);
+            let bVal = parseVal(bStr);
+            return { mStr: mStr === '+' ? '1' : (mStr === '-' ? '-1' : mStr), mVal: mNum, b: bVal, target1: { x: 0, y: bVal } };
+          }
+        }
+      } 
+      else if (activeMode === 'point-slope') {
+        let match = str.match(/^y([-+]?\d*\/?\d*)=([-+]?\d*\/?\d*)\(x([-+]?\d*\/?\d*)\)$/);
+        if (match) {
+          let y1Val = -parseVal(match[1]);
+          let mStr = match[2] || '1';
+          let mNum = parseVal(mStr);
+          let x1Val = -parseVal(match[3]);
+          return { mStr: mStr, mVal: mNum, x1: x1Val, y1: y1Val, target1: { x: x1Val, y: y1Val } };
+        }
+      } 
+      else if (activeMode === 'standard') {
+        let match = str.match(/^([-+]?\d*\/?\d*)x([-+]?\d*\/?\d*)y=(-?\d*\/?\d*)$/);
+        if (match) {
+          let aVal = parseVal(match[1]);
+          let bVal = parseVal(match[2]);
+          let cVal = parseVal(match[3]);
+          let xInt = cVal / aVal;
+          let yInt = cVal / bVal;
+          return { a: aVal, b: bVal, c: cVal, xInt: xInt, yInt: yInt, pX: { x: xInt, y: 0 }, pY: { x: 0, y: yInt } };
+        }
+      }
+
+      return null;
+    }
+
+    function newRandomEquation() {
+      let eq = "";
+      if (activeMode === 'slope-intercept') {
+        let num = (Math.floor(Math.random() * 5) - 2) || 1;
+        let den = [1, 2, 3, 4][Math.floor(Math.random() * 4)];
+        let m = (den === 1) ? `${num}` : `${num}/${den}`;
+        let b = Math.floor(Math.random() * 7) - 3;
+        eq = `y = ${m}x ${b >= 0 ? '+ ' + b : '- ' + Math.abs(b)}`;
+      } else if (activeMode === 'point-slope') {
+        let x1 = Math.floor(Math.random() * 5) - 2;
+        let y1 = Math.floor(Math.random() * 5) - 2;
+        let num = (Math.floor(Math.random() * 5) - 2) || 1;
+        let den = [1, 2, 3][Math.floor(Math.random() * 3)];
+        let m = (den === 1) ? `${num}` : `${num}/${den}`;
+        eq = `y ${y1 >= 0 ? '- ' + y1 : '+ ' + Math.abs(y1)} = ${m}(x ${x1 >= 0 ? '- ' + x1 : '+ ' + Math.abs(x1)})`;
+      } else if (activeMode === 'standard') {
+        let a = Math.floor(Math.random() * 3) + 1;
+        let b = Math.floor(Math.random() * 3) + 1;
+        let c = a * (Math.floor(Math.random() * 3) + 1);
+        eq = `${a}x + ${b}y = ${c}`;
+      }
+
+      document.getElementById('eq-input').value = eq;
+      loadEquation();
+    }
+
+    function loadEquation() {
+      let rawInput = document.getElementById('eq-input').value;
+      let parsed = parseCustomEquation(rawInput);
+
+      if (!parsed) {
+        showToast("Invalid equation format! Re-check syntax.", "error");
+        return;
+      }
+
+      targetData = parsed;
+      stepNum = 1;
+      point1 = null;
+      point2 = null;
+
+      updateUI();
+      drawGrid();
+    }
+
+    function updateUI() {
+      const title = document.getElementById('step-title');
+      const desc = document.getElementById('step-desc');
+
+      if (stepNum === 1) {
+        title.innerText = "STEP 1 OF 2: LOCATE & PLOT ANCHOR POINT";
+        if (activeMode === 'slope-intercept') desc.innerText = "Where does this line cross the y-axis? Click to plot the y-intercept anchor point!";
+        else if (activeMode === 'point-slope') desc.innerText = "Identify the given point (x₁, y₁) in the equation and click to plot it on the grid!";
+        else if (activeMode === 'standard') desc.innerText = "Find either intercept (x-intercept where y = 0 OR y-intercept where x = 0) and click to plot it!";
+      } else if (stepNum === 2) {
+        title.innerText = "STEP 2 OF 2: APPLY SLOPE & PLOT SECOND POINT";
+        if (activeMode === 'standard') desc.innerText = "Now calculate and click to plot the remaining intercept on the grid!";
+        else desc.innerText = `Use the slope m = ${targetData.mStr} (Rise / Run) to click and plot a second point!`;
+      } else {
+        title.innerText = "⚡ LINE SUCCESSFULLY GRAPHED!";
+        desc.innerText = "Great job! The line has been drawn accurately through both points.";
+      }
+    }
+
+    function drawGrid() {
+      const svg = document.getElementById('grid-svg');
+      svg.innerHTML = `
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/>
+          </marker>
+        </defs>
+      `;
+
+      for (let i = -10; i <= 10; i++) {
+        let isAxis = (i === 0);
+        
+        let vLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        vLine.setAttribute('x1', i); vLine.setAttribute('y1', -10);
+        vLine.setAttribute('x2', i); vLine.setAttribute('y2', 10);
+        vLine.setAttribute('stroke', isAxis ? '#94a3b8' : '#1e293b');
+        vLine.setAttribute('stroke-width', isAxis ? '0.3' : '0.1');
+        svg.appendChild(vLine);
+
+        let hLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        hLine.setAttribute('x1', -10); hLine.setAttribute('y1', i);
+        hLine.setAttribute('x2', 10);  hLine.setAttribute('y2', i);
+        hLine.setAttribute('stroke', isAxis ? '#94a3b8' : '#1e293b');
+        hLine.setAttribute('stroke-width', isAxis ? '0.3' : '0.1');
+        svg.appendChild(hLine);
+      }
+
+      let vecGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      vecGroup.setAttribute('id', 'vec-group');
+      svg.appendChild(vecGroup);
+
+      if (point1) {
+        let c1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c1.setAttribute('cx', point1.x); c1.setAttribute('cy', -point1.y);
+        c1.setAttribute('r', '0.5'); c1.setAttribute('fill', '#fbbf24');
+        svg.appendChild(c1);
+      }
+
+      if (point2) {
+        let c2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c2.setAttribute('cx', point2.x); c2.setAttribute('cy', -point2.y);
+        c2.setAttribute('r', '0.5'); c2.setAttribute('fill', '#4ade80');
+        svg.appendChild(c2);
+
+        let dx = point2.x - point1.x;
+        let dy = point2.y - point1.y;
+
+        let line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', -10); line.setAttribute('y1', -(point1.y + (-10 - point1.x) * (dy / dx)));
+        line.setAttribute('x2', 10);  line.setAttribute('y2', -(point1.y + (10 - point1.x) * (dy / dx)));
+        line.setAttribute('stroke', '#38bdf8');
+        line.setAttribute('stroke-width', '0.4');
+        line.setAttribute('marker-start', 'url(#arrow)');
+        line.setAttribute('marker-end', 'url(#arrow)');
+        svg.appendChild(line);
+      }
+    }
+
+    function initGrid() {
+      const svg = document.getElementById('grid-svg');
+
+      function getCoords(e) {
+        const rect = svg.getBoundingClientRect();
+        let x = Math.round(((e.clientX - rect.left) / rect.width) * 20 - 10);
+        let y = Math.round(10 - ((e.clientY - rect.top) / rect.height) * 20);
+        return { x, y };
+      }
+
+      svg.onmousemove = function(e) {
+        let c = getCoords(e);
+        document.getElementById('coord-hud').innerText = `Cursor: (${c.x}, ${c.y})`;
+
+        if (stepNum === 2 && point1) {
+          let group = document.getElementById('vec-group');
+          if (group) {
+            group.innerHTML = `
+              <line x1="${point1.x}" y1="${-point1.y}" x2="${point1.x}" y2="${-c.y}" stroke="#fbbf24" stroke-width="0.25" stroke-dasharray="0.3, 0.3"/>
+              <line x1="${point1.x}" y1="${-c.y}" x2="${c.x}" y2="${-c.y}" stroke="#38bdf8" stroke-width="0.25" stroke-dasharray="0.3, 0.3"/>
+              <circle cx="${c.x}" cy="${-c.y}" r="0.4" fill="rgba(56, 189, 248, 0.5)"/>
+            `;
+          }
+        }
+      };
+
+      svg.onclick = function(e) {
+        let c = getCoords(e);
+
+        if (stepNum === 1) {
+          if (activeMode === 'standard') {
+            let hitX = (c.x === targetData.pX.x && c.y === targetData.pX.y);
+            let hitY = (c.x === targetData.pY.x && c.y === targetData.pY.y);
+            if (hitX || hitY) {
+              point1 = c;
+              stepNum = 2;
+              showToast("First intercept placed!", "success");
+              updateUI();
+              drawGrid();
+            } else {
+              showToast(`Incorrect point (${c.x}, ${c.y})! Click an intercept (where x=0 or y=0).`, "error");
+            }
+          } else {
+            if (c.x === targetData.target1.x && c.y === targetData.target1.y) {
+              point1 = c;
+              stepNum = 2;
+              showToast("Correct anchor point placed!", "success");
+              updateUI();
+              drawGrid();
+            } else {
+              showToast(`Incorrect point (${c.x}, ${c.y})! Re-check target coordinates.`, "error");
+            }
+          }
+        } else if (stepNum === 2) {
+          if (c.x === point1.x && c.y === point1.y) return;
+
+          let valid = false;
+          if (activeMode === 'standard') {
+            let isOtherX = (point1.x !== targetData.pX.x || point1.y !== targetData.pX.y) && (c.x === targetData.pX.x && c.y === targetData.pX.y);
+            let isOtherY = (point1.x !== targetData.pY.x || point1.y !== targetData.pY.y) && (c.x === targetData.pY.x && c.y === targetData.pY.y);
+            valid = isOtherX || isOtherY;
+          } else {
+            let slope = (c.y - point1.y) / (c.x - point1.x);
+            valid = Math.abs(slope - targetData.mVal) < 0.001;
+          }
+
+          if (valid) {
+            point2 = c;
+            stepNum = 3;
+            showToast("Line complete!", "success");
+            updateUI();
+            drawGrid();
+          } else {
+            showToast("Incorrect point! Re-check intercept coordinates.", "error");
+          }
+        }
+      };
+    }
+
+    function showToast(msg, type) {
+      const toast = document.getElementById('feedback-toast');
+      toast.innerText = msg;
+      toast.className = `feedback-toast ${type}`;
+      toast.style.display = 'block';
+      setTimeout(() => toast.style.display = 'none', 2500);
+    }
+  </script>
+</body>
+</html>
